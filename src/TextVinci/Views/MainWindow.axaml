@@ -1,0 +1,223 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:TextVinci.ViewModels"
+        xmlns:controls="using:TextVinci.Controls"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="700"
+        x:Class="TextVinci.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="TextVinci — ASCII / ANSI Art Editor"
+        Width="1200" Height="700"
+        MinWidth="800" MinHeight="500">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <DockPanel>
+
+        <!-- ═══ Menu bar ═══════════════════════════════════════════════ -->
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_File">
+                <MenuItem Header="_New Canvas"   Command="{Binding NewCanvasCommand}"/>
+                <Separator/>
+                <MenuItem Header="_Open Image…"           Command="{Binding OpenImageCommand}"
+                          CommandParameter="{Binding RelativeSource={RelativeSource AncestorType=Window}}"/>
+                <MenuItem Header="Open _Reference Image…" Command="{Binding OpenReferenceImageCommand}"
+                          CommandParameter="{Binding RelativeSource={RelativeSource AncestorType=Window}}"/>
+                <Separator/>
+                <MenuItem Header="Export _ASCII (.txt)…"  Command="{Binding ExportAsciiCommand}"
+                          CommandParameter="{Binding RelativeSource={RelativeSource AncestorType=Window}}"/>
+                <MenuItem Header="Export _ANSI (.ans)…"   Command="{Binding ExportAnsiCommand}"
+                          CommandParameter="{Binding RelativeSource={RelativeSource AncestorType=Window}}"/>
+                <Separator/>
+                <MenuItem Header="E_xit" Click="OnExitClicked"/>
+            </MenuItem>
+            <MenuItem Header="_View">
+                <MenuItem Header="Zoom _In"    Click="OnZoomIn"/>
+                <MenuItem Header="Zoom _Out"   Click="OnZoomOut"/>
+                <MenuItem Header="Zoom _Reset" Click="OnZoomReset"/>
+            </MenuItem>
+        </Menu>
+
+        <!-- ═══ Toolbar ════════════════════════════════════════════════ -->
+        <Border DockPanel.Dock="Top" Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+                Padding="6,4" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+            <WrapPanel Orientation="Horizontal">
+
+                <!-- Paint tools -->
+                <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,0,12,0">
+                    <TextBlock Text="Tools:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                    <ToggleButton Content="✏ Pencil"   IsChecked="{Binding SelectedTool, Converter={x:Static vm:ToolConverter.Instance}, ConverterParameter=Pencil}"     Padding="8,3"/>
+                    <ToggleButton Content="⌫ Eraser"  IsChecked="{Binding SelectedTool, Converter={x:Static vm:ToolConverter.Instance}, ConverterParameter=Eraser}"     Padding="8,3"/>
+                    <ToggleButton Content="🪣 Fill"    IsChecked="{Binding SelectedTool, Converter={x:Static vm:ToolConverter.Instance}, ConverterParameter=FloodFill}" Padding="8,3"/>
+                    <ToggleButton Content="🎨 Pick"    IsChecked="{Binding SelectedTool, Converter={x:Static vm:ToolConverter.Instance}, ConverterParameter=ColorPicker}" Padding="8,3"/>
+                </StackPanel>
+
+                <!-- Current character -->
+                <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,0,12,0">
+                    <TextBlock Text="Char:" VerticalAlignment="Center"/>
+                    <TextBox Text="{Binding PaintChar, Converter={x:Static vm:CharConverter.Instance}}"
+                             Width="32" MaxLength="1" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Colors -->
+                <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,0,12,0">
+                    <TextBlock Text="FG:" VerticalAlignment="Center"/>
+                    <Border Width="24" Height="24" CornerRadius="3"
+                            Background="{Binding ForegroundColor, Converter={x:Static vm:DrawingColorConverter.Instance}}"
+                            BorderBrush="Gray" BorderThickness="1"
+                            ToolTip.Tip="{Binding ForegroundColor.Name}"/>
+                    <Button Content="…" Padding="4,2" Click="OnPickForeground"/>
+                </StackPanel>
+
+                <!-- Zoom -->
+                <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,0,12,0">
+                    <TextBlock Text="Zoom:" VerticalAlignment="Center"/>
+                    <Slider Minimum="0.5" Maximum="4.0" Value="{Binding Zoom}"
+                            Width="100" VerticalAlignment="Center" TickFrequency="0.5" IsSnapToTickEnabled="True"/>
+                    <TextBlock Text="{Binding Zoom, StringFormat={}{0:P0}}" VerticalAlignment="Center" Width="42"/>
+                </StackPanel>
+
+            </WrapPanel>
+        </Border>
+
+        <!-- ═══ Status bar ════════════════════════════════════════════ -->
+        <Border DockPanel.Dock="Bottom" Padding="6,2"
+                BorderThickness="0,1,0,0" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Right" Margin="8,0,0,0"
+                           Text="{Binding CanvasWidth, StringFormat={}W:{0}}"/>
+                <TextBlock DockPanel.Dock="Right" Margin="8,0,0,0"
+                           Text="{Binding CanvasHeight, StringFormat={}H:{0}}"/>
+                <TextBlock DockPanel.Dock="Right" Margin="8,0,0,0"
+                           Text="{Binding CursorX, StringFormat={}Col:{0}}"/>
+                <TextBlock DockPanel.Dock="Right" Margin="8,0,0,0"
+                           Text="{Binding CursorY, StringFormat={}Row:{0}}"/>
+                <TextBlock Text="{Binding StatusMessage}"/>
+            </DockPanel>
+        </Border>
+
+        <!-- ═══ Main content area ══════════════════════════════════════ -->
+        <Grid ColumnDefinitions="*,Auto">
+
+            <!-- Canvas scroll area -->
+            <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto"
+                          Background="#1A1A1A">
+                <controls:AsciiCanvasControl x:Name="AsciiEditor"
+                    CanvasSource="{Binding Canvas}"
+                    Zoom="{Binding Zoom}"
+                    CellWidth="{Binding CellWidth}"
+                    CellHeight="{Binding CellHeight}"
+                    ReferenceImagePath="{Binding ReferenceImagePath}"
+                    ReferenceImageOpacity="{Binding ReferenceImageOpacity}"
+                    ShowReferenceImage="{Binding ShowReferenceImage}"
+                    Margin="8"/>
+            </ScrollViewer>
+
+            <!-- Right panel -->
+            <Border Grid.Column="1" Width="240" Padding="8"
+                    BorderThickness="1,0,0,0"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="12">
+
+                        <!-- Canvas size -->
+                        <Expander Header="Canvas" IsExpanded="True">
+                            <StackPanel Spacing="6" Margin="0,4,0,0">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <TextBlock Grid.Column="0" Text="Width:" VerticalAlignment="Center" Width="56"/>
+                                    <NumericUpDown Grid.Column="1" Value="{Binding CanvasWidth}"
+                                                   Minimum="1" Maximum="500" Increment="1"/>
+                                </Grid>
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <TextBlock Grid.Column="0" Text="Height:" VerticalAlignment="Center" Width="56"/>
+                                    <NumericUpDown Grid.Column="1" Value="{Binding CanvasHeight}"
+                                                   Minimum="1" Maximum="200" Increment="1"/>
+                                </Grid>
+                                <Button Content="Apply New Canvas" HorizontalAlignment="Stretch"
+                                        Command="{Binding NewCanvasCommand}"/>
+                            </StackPanel>
+                        </Expander>
+
+                        <!-- Conversion settings -->
+                        <Expander Header="Image Conversion" IsExpanded="True">
+                            <StackPanel Spacing="6" Margin="0,4,0,0">
+                                <TextBlock Text="Character Set:"/>
+                                <ComboBox ItemsSource="{Binding CharacterSetNames}"
+                                          SelectedIndex="0"
+                                          SelectionChanged="OnCharSetChanged"
+                                          HorizontalAlignment="Stretch"/>
+
+                                <TextBlock Text="Dithering:"/>
+                                <ComboBox ItemsSource="{Binding DitheringModes}"
+                                          SelectedItem="{Binding SelectedDithering}"
+                                          HorizontalAlignment="Stretch"/>
+
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <TextBlock Grid.Column="0" Text="Levels:" VerticalAlignment="Center" Width="56"/>
+                                    <NumericUpDown Grid.Column="1" Value="{Binding DitheringLevels}"
+                                                   Minimum="2" Maximum="256" Increment="1"/>
+                                </Grid>
+
+                                <CheckBox Content="Use Colors"         IsChecked="{Binding UseColors}"/>
+                                <CheckBox Content="Invert Brightness"  IsChecked="{Binding InvertBrightness}"/>
+                                <CheckBox Content="Color Gradient"     IsChecked="{Binding UseColorGradient}"/>
+
+                                <TextBlock Text="Gradient:" IsVisible="{Binding UseColorGradient}"/>
+                                <ComboBox ItemsSource="{Binding GradientNames}"
+                                          SelectedItem="{Binding SelectedGradientName}"
+                                          IsVisible="{Binding UseColorGradient}"
+                                          HorizontalAlignment="Stretch"/>
+
+                                <Button Content="Open &amp; Convert Image…"
+                                        HorizontalAlignment="Stretch"
+                                        Command="{Binding OpenImageCommand}"
+                                        CommandParameter="{Binding RelativeSource={RelativeSource AncestorType=Window}}"/>
+                            </StackPanel>
+                        </Expander>
+
+                        <!-- Reference image -->
+                        <Expander Header="Reference Image">
+                            <StackPanel Spacing="6" Margin="0,4,0,0">
+                                <CheckBox Content="Show Reference Image"
+                                          IsChecked="{Binding ShowReferenceImage}"/>
+                                <TextBlock Text="Opacity:"/>
+                                <Slider Minimum="0.0" Maximum="1.0"
+                                        Value="{Binding ReferenceImageOpacity}"
+                                        TickFrequency="0.05" IsSnapToTickEnabled="False"/>
+                                <TextBlock Text="{Binding ReferenceImageOpacity, StringFormat={}{0:P0}}"/>
+                                <Button Content="Open Reference Image…"
+                                        HorizontalAlignment="Stretch"
+                                        Command="{Binding OpenReferenceImageCommand}"
+                                        CommandParameter="{Binding RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                <TextBlock Text="{Binding ReferenceImagePath}"
+                                           TextWrapping="Wrap" FontSize="10"
+                                           IsVisible="{Binding ReferenceImagePath, Converter={x:Static vm:NullToBoolConverter.Instance}}"/>
+                            </StackPanel>
+                        </Expander>
+
+                        <!-- Export -->
+                        <Expander Header="Export">
+                            <StackPanel Spacing="6" Margin="0,4,0,0">
+                                <Button Content="Export Plain ASCII (.txt)…"
+                                        HorizontalAlignment="Stretch"
+                                        Command="{Binding ExportAsciiCommand}"
+                                        CommandParameter="{Binding RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                <Button Content="Export ANSI Color (.ans)…"
+                                        HorizontalAlignment="Stretch"
+                                        Command="{Binding ExportAnsiCommand}"
+                                        CommandParameter="{Binding RelativeSource={RelativeSource AncestorType=Window}}"/>
+                            </StackPanel>
+                        </Expander>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+        </Grid>
+    </DockPanel>
+</Window>

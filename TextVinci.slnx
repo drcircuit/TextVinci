@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TextVinci.Core/TextVinci.Core.csproj" />
+    <Project Path="src/TextVinci/TextVinci.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TextVinci.Core.Tests/TextVinci.Core.Tests.csproj" />
+  </Folder>
+</Solution>
